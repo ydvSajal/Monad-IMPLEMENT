@@ -1,0 +1,11 @@
+{
+  "chainId": 10143,
+  "gigEscrow": "",
+  "groundedReputation": "0xaDDd1f2F876CD253C57177b675905Bdb0061bF82",
+  "receiptRegistry": "0xa89b76Ea9AcEA12A66Fb23d318219b9119362301",
+  "receiptRouter": "0xab442c3cbc2997a6218FEA0DD253c3717edfc62e",
+  "reviewerRegistry": "0xFb38DcB72C222d3943579b4F2c4C91ebcBE4eBa6",
+  "erc8004Identity": "0x8004A818BFB912233c491871b3d84c89A494BD9e",
+  "erc8004Reputation": "0x8004B663056A597Dffe9eCcC1965A193B7388713",
+  "usdc": "0x534b2f3A21130d7a60830c2Df862319e593943A3"
+}
