@@ -6,8 +6,11 @@ create table if not exists jobs (
   title text not null,
   body text not null,
   meta_hash text not null,
+  category text not null default 'other', -- offchain label for browsing; not part of meta_hash
   created_at timestamptz not null default now()
 );
+alter table jobs add column if not exists category text not null default 'other';
+create index if not exists jobs_category_idx on jobs (category);
 
 create table if not exists proposals (
   id serial primary key,

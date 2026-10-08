@@ -83,7 +83,7 @@ flowchart TB
 |---|---|---|
 | Monad contracts | Money, job state, deadlines, receipts, scores | Everything that matters |
 | Next.js app | UI, wallet signing, API routes | Nothing: every read is checked against the chain |
-| Postgres | Job title/body, proposal pitches | Convenience only; job text is hash-checked against the chain |
+| Postgres | Job title/body, category, proposal pitches | Convenience only; job text is hash-checked against the chain |
 
 ---
 
@@ -354,6 +354,8 @@ The web app links the Grounded SDK from a sibling checkout (`link:../../../MONAD
 
 Deploy: `FEE_RECIPIENT=0x… forge script script/Deploy.s.sol --rpc-url $NEXT_PUBLIC_RPC_URL --account $DEPLOYER_ACCOUNT --broadcast`, then set `NEXT_PUBLIC_GIG_ESCROW`.
 
+**See the UI locally (no deploy):** start the anvil fork, then from `apps/web` run `NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8545 node tests/local-up.ts` (deploys an escrow on the fork, serves an in-process Postgres on :55432, seeds 7 demo jobs across categories, prints the `pnpm dev` command). Set `SESSION_SECRET` for production builds.
+
 **Addresses (Monad Testnet, 10143):**
 
 | Contract | Address |
@@ -371,10 +373,10 @@ Deploy: `FEE_RECIPIENT=0x… forge script script/Deploy.s.sol --rpc-url $NEXT_PU
 
 ## Status
 
-Done and tested:
-- Contract: 45 unit tests (including 2 fuzz), 1 invariant over every path including disputes, and 6 live-fork tests against the deployed Grounded contracts. The fork tests prove the receipt payer is the client on release and on dispute settlement, the trust bar refuses an unqualified agent, and wrong-agent and wrong-amount signatures revert.
-- Web app: builds and reads live Grounded scores.
-- Proposal signature checks: verified against the live identity registry (a forged signer gets 403, an altered pitch gets 401).
+Done and tested (all local, nothing on the live network; see `apps/web/tests/README.md`):
+- Contract: 45 unit tests (including 2 fuzz), 1 invariant over every path including disputes, and 6 live-fork tests against the deployed Grounded contracts.
+- App + chain end to end (`pnpm test`, 39 tests incl. wallet sign-in and categories): GigEscrow deployed on an anvil fork of Monad Testnet and driven with the app's own code. Covers funding, accept/deliver/release with real EIP-3009 signatures, receipt payer == client, rating through the Grounded SDK, the trust bar that rating then unlocks, every refund/timeout/dispute path, access control, conservation of funds, and the API routes on an in-process Postgres.
+- Browser (Chrome, production build, injected wallet, 6 tests): wallet sign-in (SIWE), onboarding, post and fund, signed proposal, accept, deliver, release, dispute and settlement.
 
 Not done: testnet deploy, seeded demo jobs, demo video.
 

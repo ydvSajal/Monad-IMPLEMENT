@@ -110,9 +110,10 @@ export const ZERO = "0x0000000000000000000000000000000000000000" as Address;
 export async function signRouterPull(wallet: WalletClient, from: Address, agentId: bigint, value: bigint) {
   const salt = keccak256(toHex(crypto.getRandomValues(new Uint8Array(32))));
   const nonce = await publicClient.readContract({ address: ADDR.router, abi: routerAbi, functionName: "authorizationNonce", args: [agentId, salt] });
-  const validBefore = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  // chain time, not the browser clock: a skewed clock would sign an authorization that is already expired
+  const validBefore = (await publicClient.getBlock()).timestamp + 3600n;
   const signature = await wallet.signTypedData({
-    account: from,
+    account: wallet.account ?? from, // injected wallets: a json-rpc account; a local key signs in-process
     domain: { name: "USDC", version: "2", chainId: monad.id, verifyingContract: ADDR.usdc },
     types: { ReceiveWithAuthorization: [
       { name: "from", type: "address" }, { name: "to", type: "address" }, { name: "value", type: "uint256" },
