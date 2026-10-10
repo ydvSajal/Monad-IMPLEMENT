@@ -374,8 +374,8 @@ Deploy: `FEE_RECIPIENT=0x… forge script script/Deploy.s.sol --rpc-url $NEXT_PU
 ## Status
 
 Done and tested (all local, nothing on the live network; see `apps/web/tests/README.md`):
-- Contract: 45 unit tests (including 2 fuzz), 1 invariant over every path including disputes, and 6 live-fork tests against the deployed Grounded contracts.
-- App + chain end to end (`pnpm test`, 39 tests incl. wallet sign-in and categories): GigEscrow deployed on an anvil fork of Monad Testnet and driven with the app's own code. Covers funding, accept/deliver/release with real EIP-3009 signatures, receipt payer == client, rating through the Grounded SDK, the trust bar that rating then unlocks, every refund/timeout/dispute path, access control, conservation of funds, and the API routes on an in-process Postgres.
+- Contract: 54 unit tests (including 2 fuzz), 1 invariant over every path including disputes, and 8 live-fork tests against the deployed Grounded contracts.
+- App + chain end to end (`pnpm test`, 46 tests incl. wallet sign-in and categories): GigEscrow deployed on an anvil fork of Monad Testnet and driven with the app's own code. Covers funding, accept/deliver/release with real EIP-3009 signatures, receipt payer == client, rating through the Grounded SDK, the trust bar that rating then unlocks, every refund/timeout/dispute path, access control, conservation of funds, and the API routes on an in-process Postgres.
 - Browser (Chrome, production build, injected wallet, 6 tests): wallet sign-in (SIWE), onboarding, post and fund, signed proposal, accept, deliver, release, dispute and settlement.
 
 Not done: testnet deploy, seeded demo jobs, demo video.
@@ -387,7 +387,10 @@ Grounded verifies passkeys for rpId `grounded.sajal.sbs`. A page on another doma
 ## Known limits
 
 - The trust bar is checked at `accept` only; a score drop mid-job keeps the job.
-- If a freelancer unsets their payout wallet after accepting, `release` and `autoRelease` revert until they reset it. The UI rechecks before signing.
+- If a freelancer unsets their payout wallet after accepting, `release` and `settle` revert until they reset it (the router needs it). The UI rechecks before signing. `autoRelease`, `rule` and the timeout split fall back to the agent owner.
+- The router relays a client's payment signature for anyone. If someone front-runs `release` or `settle` with it, the router pays the freelancer from the client's own wallet and the escrow call reverts. The client then calls `claimPaid(jobId, receiptId)` with that Grounded receipt and gets the escrowed copy back. The job closes exactly as a normal release would, and the UI does this automatically. Remaining gap: a payment of the same amount from the same client to the same agent through *another* app, made while this job is open, would also count.
+- The client must sign with an EOA: the router takes `v, r, s`, so smart-contract wallets cannot `release` or `settle` (the freelancer is still paid via `autoRelease` or the dispute paths).
+- Payouts are pushed. If a transfer fails (USDC blacklist or pause), the amount is recorded in `owed[payee]` instead of reverting, so one blocked address never freezes anyone else's share. The payee pulls it with `withdraw()` (shown on `/me`), and only to itself.
 - A freelancer withdrawing from an `Accepted` job refunds the client and ends the job (no relisting).
 - The receipt id is cached in the client's browser after release (localStorage).
 - Arbiter and timeout payouts issue no receipt, so those outcomes can't be rated. Only a mutual settlement produces one.

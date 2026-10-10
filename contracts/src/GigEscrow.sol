@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 
 import {IGroundedReputation} from "./interfaces/IGroundedReputation.sol";
 import {IIdentityRegistry} from "./interfaces/IIdentityRegistry.sol";
+import {IReceiptRegistry} from "./interfaces/IReceiptRegistry.sol";
 import {IReceiptRouter} from "./interfaces/IReceiptRouter.sol";
 
 /// @title GigEscrow
@@ -59,6 +60,7 @@ contract GigEscrow {
     IReceiptRouter public immutable router;
     IGroundedReputation public immutable grounded;
     IIdentityRegistry public immutable identity;
+    IReceiptRegistry public immutable receipts;
     address public immutable feeRecipient;
     uint256 public immutable feeBps;
     uint256 public immutable reviewWindow; // also the time a dispute has to resolve
@@ -66,6 +68,10 @@ contract GigEscrow {
     uint256 public nextJobId = 1;
     mapping(uint256 jobId => Job) internal _jobs;
     mapping(address client => ClientStats) public clientStats;
+    /// @notice Grounded receipts already counted as payment for a job, so one payment can't settle two jobs.
+    mapping(uint256 receiptId => bool) public receiptUsed;
+    /// @notice Payouts whose transfer failed (USDC blacklist or pause). The payee pulls them with `withdraw`.
+    mapping(address payee => uint256) public owed;
 
     event JobCreated(uint256 indexed jobId, address indexed client, uint96 amount, address arbiter, bytes32 metaHash);
     event JobAccepted(uint256 indexed jobId, uint256 indexed agentId, address freelancer, uint40 deliverBy);
@@ -77,6 +83,8 @@ contract GigEscrow {
     event SettlementOffered(uint256 indexed jobId, uint96 toFreelancer);
     /// @param how 0 = settled by both parties, 1 = arbiter ruling, 2 = timeout split
     event JobResolved(uint256 indexed jobId, uint96 toFreelancer, uint8 how, uint256 receiptId);
+    event PayoutOwed(address indexed payee, uint256 amount);
+    event Withdrawn(address indexed payee, uint256 amount);
 
     error BadStatus(Status current);
     error NotClient();
@@ -91,6 +99,8 @@ contract GigEscrow {
     error BadParams();
     error NotRefundable();
     error NoOffer();
+    error ReceiptMismatch();
+    error NothingOwed();
 
     constructor(
         IERC20 usdc_,
@@ -101,11 +111,14 @@ contract GigEscrow {
         uint256 feeBps_,
         uint256 reviewWindow_
     ) {
-        if (feeRecipient_ == address(0) || feeBps_ > 2000) revert BadParams();
+        if (feeRecipient_ == address(0) || feeBps_ > 2000 || reviewWindow_ == 0) {
+            revert BadParams();
+        }
         usdc = usdc_;
         router = router_;
         grounded = grounded_;
         identity = identity_;
+        receipts = IReceiptRegistry(router_.receipts());
         feeRecipient = feeRecipient_;
         feeBps = feeBps_;
         reviewWindow = reviewWindow_;
@@ -197,7 +210,7 @@ contract GigEscrow {
         uint256 amount = j.amount;
 
         receiptId = _payViaRouter(j, amount, validAfter, validBefore, salt, signature);
-        usdc.safeTransfer(feeRecipient, feeOf(amount));
+        _send(feeRecipient, feeOf(amount));
         emit JobReleased(jobId, receiptId);
     }
 
@@ -206,14 +219,13 @@ contract GigEscrow {
         Job storage j = _jobs[jobId];
         if (j.status != Status.Delivered) revert BadStatus(j.status);
         if (block.timestamp <= uint256(j.deliveredAt) + reviewWindow) revert TooEarly();
-        address wallet = identity.getAgentWallet(j.agentId);
-        if (wallet == address(0)) revert NoAgentWallet(j.agentId);
+        address wallet = _payee(j.agentId);
         j.status = Status.AutoReleased;
         clientStats[j.client].paid++;
         uint256 amount = j.amount;
         emit JobAutoReleased(jobId, wallet);
-        usdc.safeTransfer(wallet, amount);
-        usdc.safeTransfer(feeRecipient, feeOf(amount));
+        _send(wallet, amount);
+        _send(feeRecipient, feeOf(amount));
     }
 
     /// @notice Full refund of amount + fee to the client when: nobody accepted by `acceptBy` (client),
@@ -233,6 +245,60 @@ contract GigEscrow {
         uint256 total = uint256(j.amount) + feeOf(j.amount);
         emit JobRefunded(jobId, msg.sender);
         usdc.safeTransfer(j.client, total);
+    }
+
+    /// @notice Recovery when the client's payment signature was relayed straight to the router (front-run):
+    ///         the freelancer was paid from the client's wallet, and `release`/`settle` then reverted.
+    ///         The Grounded receipt of that payment proves it, so the client gets the escrowed copy back and
+    ///         the job closes exactly as `release` (or `settle` while Disputed) would have.
+    /// @dev The receipt must be from this client, to this job's agent, in USDC, for exactly the amount due
+    ///      (`amount`, or the standing offer while Disputed), paid after the job reached its current state,
+    ///      and not already used by another job here.
+    ///      ponytail: a matching payment made through another app in that window would also qualify;
+    ///      closing that needs the router to bind receipts to a caller.
+    function claimPaid(uint256 jobId, uint256 receiptId) external {
+        Job storage j = _jobs[jobId];
+        if (msg.sender != j.client) revert NotClient();
+        uint256 due;
+        uint256 since;
+        if (j.status == Status.Accepted || j.status == Status.Delivered) {
+            due = j.amount;
+            since = uint256(j.deadline) - j.deliverWithin; // accepted at
+        } else if (j.status == Status.Disputed) {
+            if (!j.offered || j.offer == 0) revert NoOffer();
+            due = j.offer;
+            since = uint256(j.deadline) - reviewWindow; // disputed at
+        } else {
+            revert BadStatus(j.status);
+        }
+        if (receiptUsed[receiptId]) revert ReceiptMismatch();
+        IReceiptRegistry.Receipt memory r = receipts.get(receiptId);
+        if (
+            r.payer != j.client || r.agentId != j.agentId || r.token != address(usdc) || r.amount != due
+                || r.paidAt < since
+        ) revert ReceiptMismatch();
+        receiptUsed[receiptId] = true;
+        clientStats[j.client].paid++;
+
+        if (j.status == Status.Disputed) {
+            j.status = Status.Resolved;
+            // forge-lint: disable-next-line(unsafe-typecast)
+            emit JobResolved(jobId, uint96(due), 0, receiptId);
+        } else {
+            j.status = Status.Released;
+            emit JobReleased(jobId, receiptId);
+        }
+        usdc.safeTransfer(j.client, due); // reimburse what left the client's wallet
+        _closeSplit(j, due);
+    }
+
+    /// @notice Pull a payout that could not be pushed. Only to the payee itself.
+    function withdraw() external {
+        uint256 value = owed[msg.sender];
+        if (value == 0) revert NothingOwed();
+        owed[msg.sender] = 0;
+        emit Withdrawn(msg.sender, value);
+        usdc.safeTransfer(msg.sender, value);
     }
 
     // ---- disputes: settle together, or the arbiter rules, or it splits 50/50 at the deadline
@@ -307,7 +373,7 @@ contract GigEscrow {
         j.status = Status.Resolved;
         if (toFreelancer != 0) {
             clientStats[j.client].paid++;
-            usdc.safeTransfer(_payee(j.agentId), toFreelancer);
+            _send(_payee(j.agentId), toFreelancer);
         }
         _closeSplit(j, toFreelancer);
         emit JobResolved(jobId, toFreelancer, how, 0);
@@ -317,8 +383,8 @@ contract GigEscrow {
     function _closeSplit(Job storage j, uint256 toFreelancer) private {
         uint256 fee = feeOf(toFreelancer);
         uint256 back = uint256(j.amount) - toFreelancer + feeOf(j.amount) - fee;
-        if (fee != 0) usdc.safeTransfer(feeRecipient, fee);
-        if (back != 0) usdc.safeTransfer(j.client, back);
+        _send(feeRecipient, fee);
+        _send(j.client, back);
     }
 
     function _payViaRouter(
@@ -330,12 +396,25 @@ contract GigEscrow {
         bytes calldata signature
     ) private returns (uint256) {
         usdc.safeTransfer(j.client, value);
-        return router.payWithAuthorization(
+        uint256 receiptId = router.payWithAuthorization(
             j.agentId, address(usdc), j.client, value, validAfter, validBefore, salt, signature
         );
+        receiptUsed[receiptId] = true;
+        return receiptId;
     }
 
-    /// @dev A freelancer must not be able to block a ruling by clearing their payout wallet.
+    /// @dev Push, and if the token refuses (blacklisted payee, paused USDC), owe it instead of reverting,
+    ///      so one blocked address can't freeze anyone else's share. A caller who starves the inner
+    ///      transfer of gas only moves the payout into `owed`; nothing is lost.
+    function _send(address to, uint256 value) private {
+        if (value == 0) return;
+        if (!usdc.trySafeTransfer(to, value)) {
+            owed[to] += value;
+            emit PayoutOwed(to, value);
+        }
+    }
+
+    /// @dev A freelancer must not be able to block a ruling or auto-release by clearing their payout wallet.
     function _payee(uint256 agentId) private view returns (address w) {
         w = identity.getAgentWallet(agentId);
         if (w == address(0)) w = identity.ownerOf(agentId);

@@ -2,7 +2,7 @@
 
 import { ArrowRightIcon, CheckCircleIcon } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { parseEventLogs, type Address } from "viem";
 
@@ -10,7 +10,7 @@ import { SignInGate } from "@/components/SignInGate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ADDR, identityAbi, monad, publicClient } from "@/lib/gig";
+import { ADDR, escrowAbi, identityAbi, monad, publicClient, usdc as fmt } from "@/lib/gig";
 import { useWallet } from "@/lib/wallet";
 
 export default function Me() {
@@ -21,6 +21,11 @@ export default function Me() {
   const [msg, setMsg] = useState("");
   const [registered, setRegistered] = useState(false);
   const [walletSet, setWalletSet] = useState(false);
+  // payouts the escrow could not push (USDC blacklist or pause); normally always 0
+  const [owed, setOwed] = useState(0n);
+  useEffect(() => {
+    if (account && ADDR.escrow) publicClient.readContract({ address: ADDR.escrow, abi: escrowAbi, functionName: "owed", args: [account] }).then(setOwed, () => {});
+  }, [account]);
 
   const run = (fn: () => Promise<void>) => async () => {
     try {
@@ -97,6 +102,16 @@ export default function Me() {
             </div>
             <Button className="rounded-full" onClick={setWalletFn} disabled={!account || !agentId || payout.toLowerCase() !== account?.toLowerCase()}>Set payout wallet</Button>
           </div>
+          {owed > 0n && (
+            <div className={step}>
+              <h2 className="text-lg font-semibold">Owed to you: {fmt(owed)} USDC</h2>
+              <p className="muted text-sm">A payout to this address failed when it was sent, so the escrow is holding it for you.</p>
+              <Button className="rounded-full" onClick={run(async () => {
+                await write({ address: ADDR.escrow, abi: escrowAbi, functionName: "withdraw", args: [] });
+                setOwed(0n);
+              })}>Withdraw</Button>
+            </div>
+          )}
           {agentId && (
             <Link href={`/freelancers/${agentId}`} className="inline-flex items-center gap-1 text-primary hover:underline">
               View your profile <ArrowRightIcon />

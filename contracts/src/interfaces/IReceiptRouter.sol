@@ -15,4 +15,6 @@ interface IReceiptRouter {
     ) external returns (uint256 receiptId);
 
     function authorizationNonce(uint256 agentId, bytes32 salt) external pure returns (bytes32);
+
+    function receipts() external view returns (address);
 }

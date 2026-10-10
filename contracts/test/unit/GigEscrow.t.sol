@@ -107,6 +107,16 @@ contract GigEscrowTest is Test {
             500,
             7 days
         );
+        vm.expectRevert(GigEscrow.BadParams.selector);
+        new GigEscrow(
+            IERC20(address(usdc)),
+            IReceiptRouter(address(router)),
+            IGroundedReputation(address(grounded)),
+            IIdentityRegistry(address(identity)),
+            feeTo,
+            500,
+            0
+        );
     }
 
     // ---- accept
@@ -267,6 +277,17 @@ contract GigEscrowTest is Test {
         escrow.autoRelease(id);
         assertEq(usdc.balanceOf(wallet), AMOUNT);
         assertEq(usdc.balanceOf(feeTo), FEE);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function test_autoRelease_paysOwnerIfWalletCleared() public {
+        uint256 id = _accepted(0, 0);
+        vm.prank(freelancer);
+        escrow.deliver(id, 0);
+        identity.setWallet(AGENT, address(0));
+        vm.warp(block.timestamp + 7 days + 1);
+        escrow.autoRelease(id);
+        assertEq(usdc.balanceOf(freelancer), AMOUNT);
         assertEq(usdc.balanceOf(address(escrow)), 0);
     }
 
@@ -515,5 +536,146 @@ contract GigEscrowTest is Test {
         assertEq(usdc.balanceOf(address(escrow)), 0);
         assertEq(usdc.balanceOf(wallet), amount);
         assertEq(usdc.balanceOf(feeTo), escrow.feeOf(amount));
+    }
+
+    // ---- front-run recovery: the client's signature was relayed straight to the router
+    function _frontRun(uint256 value) internal returns (uint256 receiptId) {
+        vm.prank(stranger);
+        receiptId = router.payWithAuthorization(
+            AGENT, address(usdc), client, value, 0, block.timestamp + 1 hours, bytes32("salt"), _sig()
+        );
+    }
+
+    function test_claimPaid_afterFrontRunOnRelease() public {
+        uint256 id = _accepted(0, 0);
+        vm.prank(freelancer);
+        escrow.deliver(id, 0);
+        uint256 receiptId = _frontRun(AMOUNT); // paid from the client's own wallet
+        vm.expectRevert(MockUSDC.AuthorizationUsed.selector);
+        _release(id);
+
+        vm.prank(client);
+        escrow.claimPaid(id, receiptId);
+        assertEq(uint8(escrow.getJob(id).status), uint8(GigEscrow.Status.Released));
+        // net effect identical to a normal release: the freelancer was paid once, the client paid once
+        assertEq(usdc.balanceOf(wallet), AMOUNT);
+        assertEq(usdc.balanceOf(feeTo), FEE);
+        assertEq(usdc.balanceOf(client), 1000e6 - AMOUNT - FEE);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+        // the job is closed, so autoRelease can't pay a second time
+        vm.warp(block.timestamp + 8 days);
+        vm.expectRevert(abi.encodeWithSelector(GigEscrow.BadStatus.selector, GigEscrow.Status.Released));
+        escrow.autoRelease(id);
+    }
+
+    function test_claimPaid_afterFrontRunOnSettle() public {
+        uint256 id = _disputed(address(0));
+        vm.prank(freelancer);
+        escrow.offerSettlement(id, 60e6);
+        uint256 receiptId = _frontRun(60e6);
+        vm.prank(client);
+        escrow.claimPaid(id, receiptId);
+        assertEq(uint8(escrow.getJob(id).status), uint8(GigEscrow.Status.Resolved));
+        assertEq(usdc.balanceOf(wallet), 60e6);
+        assertEq(usdc.balanceOf(feeTo), 3e6);
+        assertEq(usdc.balanceOf(client), 1000e6 - 60e6 - 3e6); // same as settle
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function test_claimPaid_rejectsBadReceipts() public {
+        uint256 id = _accepted(0, 0);
+        uint256 other = _create(0, 0);
+
+        uint256 wrongAmount = _frontRunSalt(AMOUNT - 1, "a");
+        vm.prank(client);
+        vm.expectRevert(GigEscrow.ReceiptMismatch.selector);
+        escrow.claimPaid(id, wrongAmount);
+
+        vm.prank(stranger);
+        vm.expectRevert(GigEscrow.NotClient.selector);
+        escrow.claimPaid(id, wrongAmount);
+
+        // a receipt from before this job was accepted does not count
+        uint256 early = _frontRunSalt(AMOUNT, "b");
+        vm.warp(block.timestamp + 1);
+        vm.prank(freelancer);
+        escrow.accept(other, AGENT);
+        vm.prank(client);
+        vm.expectRevert(GigEscrow.ReceiptMismatch.selector);
+        escrow.claimPaid(other, early);
+
+        // one payment can't close two jobs
+        uint256 good = _frontRunSalt(AMOUNT, "c");
+        vm.prank(client);
+        escrow.claimPaid(id, good);
+        vm.prank(client);
+        vm.expectRevert(GigEscrow.ReceiptMismatch.selector);
+        escrow.claimPaid(other, good);
+
+        // nor can a receipt the escrow itself produced through release
+        uint256 third = _accepted(0, 0);
+        uint256 released = _release(third);
+        vm.prank(client);
+        vm.expectRevert(GigEscrow.ReceiptMismatch.selector);
+        escrow.claimPaid(other, released);
+    }
+
+    function test_claimPaid_disputedNeedsOffer() public {
+        uint256 id = _disputed(address(0));
+        uint256 receiptId = _frontRun(AMOUNT);
+        vm.prank(client);
+        vm.expectRevert(GigEscrow.NoOffer.selector);
+        escrow.claimPaid(id, receiptId);
+    }
+
+    function _frontRunSalt(uint256 value, bytes32 salt) internal returns (uint256) {
+        vm.prank(stranger);
+        return
+            router.payWithAuthorization(AGENT, address(usdc), client, value, 0, block.timestamp + 1 hours, salt, _sig());
+    }
+
+    // ---- blocked addresses: a payout that can't be pushed is owed, nobody else is frozen
+    function test_blockedFeeRecipient_releaseStillPays() public {
+        uint256 id = _accepted(0, 0);
+        usdc.setBlocked(feeTo, true);
+        _release(id);
+        assertEq(usdc.balanceOf(wallet), AMOUNT);
+        assertEq(escrow.owed(feeTo), FEE);
+        assertEq(usdc.balanceOf(address(escrow)), FEE);
+
+        vm.prank(feeTo);
+        vm.expectRevert(abi.encodeWithSelector(MockUSDC.Blocked.selector, feeTo));
+        escrow.withdraw(); // still blocked: stays owed
+        usdc.setBlocked(feeTo, false);
+        vm.prank(feeTo);
+        escrow.withdraw();
+        assertEq(usdc.balanceOf(feeTo), FEE);
+        assertEq(escrow.owed(feeTo), 0);
+        assertEq(usdc.balanceOf(address(escrow)), 0);
+    }
+
+    function test_blockedClient_timeoutStillPaysFreelancer() public {
+        uint256 id = _disputed(address(0));
+        usdc.setBlocked(client, true);
+        vm.warp(block.timestamp + 7 days + 1);
+        escrow.resolveTimeout(id);
+        assertEq(usdc.balanceOf(wallet), AMOUNT / 2);
+        assertEq(escrow.owed(client), AMOUNT / 2 + FEE - escrow.feeOf(AMOUNT / 2));
+    }
+
+    function test_blockedFreelancer_autoReleaseStillPaysFee() public {
+        uint256 id = _accepted(0, 0);
+        vm.prank(freelancer);
+        escrow.deliver(id, 0);
+        usdc.setBlocked(wallet, true);
+        vm.warp(block.timestamp + 7 days + 1);
+        escrow.autoRelease(id);
+        assertEq(usdc.balanceOf(feeTo), FEE);
+        assertEq(escrow.owed(wallet), AMOUNT);
+    }
+
+    function test_withdraw_nothingOwed() public {
+        vm.expectRevert(GigEscrow.NothingOwed.selector);
+        escrow.withdraw();
     }
 }

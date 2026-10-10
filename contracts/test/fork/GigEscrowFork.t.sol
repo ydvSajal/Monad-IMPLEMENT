@@ -161,4 +161,50 @@ contract GigEscrowForkTest is Test {
         assertEq(USDC.balanceOf(client) - clientBefore, 600_000 + 30_000);
         assertEq(USDC.balanceOf(address(escrow)), 0);
     }
+
+    function test_fork_claimPaid_afterFrontRun() public {
+        vm.prank(client);
+        uint256 id = escrow.create(1e6, 0, 0, uint40(block.timestamp + 1 days), 3 days, address(0), 0);
+        vm.prank(owner);
+        escrow.accept(id, AGENT);
+        uint256 validBefore = block.timestamp + 1 hours;
+        bytes memory sig = _sign(AGENT, 1e6, validBefore, bytes32("salt"));
+
+        // someone copies the signature from the mempool and relays it to the real router first
+        vm.prank(address(0xBAD));
+        uint256 receiptId =
+            ROUTER.payWithAuthorization(AGENT, address(USDC), client, 1e6, 0, validBefore, bytes32("salt"), sig);
+        vm.prank(client);
+        vm.expectRevert();
+        escrow.release(id, 0, validBefore, bytes32("salt"), sig);
+
+        uint256 clientBefore = USDC.balanceOf(client);
+        vm.prank(client);
+        escrow.claimPaid(id, receiptId);
+        assertEq(USDC.balanceOf(client) - clientBefore, 1e6); // reimbursed
+        assertEq(USDC.balanceOf(client), 1000e6 - 1_050_000); // paid exactly once overall
+        assertEq(USDC.balanceOf(feeTo), 50_000);
+        assertEq(USDC.balanceOf(address(escrow)), 0);
+    }
+
+    function test_fork_blacklistedFeeRecipientDoesNotFreezeRelease() public {
+        (bool ok, bytes memory ret) = address(USDC).staticcall(abi.encodeWithSignature("blacklister()"));
+        assertTrue(ok);
+        address blacklister = abi.decode(ret, (address));
+        vm.prank(blacklister);
+        (ok,) = address(USDC).call(abi.encodeWithSignature("blacklist(address)", feeTo));
+        assertTrue(ok);
+
+        vm.prank(client);
+        uint256 id = escrow.create(1e6, 0, 0, uint40(block.timestamp + 1 days), 3 days, address(0), 0);
+        vm.prank(owner);
+        escrow.accept(id, AGENT);
+        uint256 walletBefore = USDC.balanceOf(wallet);
+        uint256 validBefore = block.timestamp + 1 hours;
+        bytes memory sig = _sign(AGENT, 1e6, validBefore, bytes32("salt"));
+        vm.prank(client);
+        escrow.release(id, 0, validBefore, bytes32("salt"), sig);
+        assertEq(USDC.balanceOf(wallet) - walletBefore, 1e6);
+        assertEq(escrow.owed(feeTo), 50_000);
+    }
 }

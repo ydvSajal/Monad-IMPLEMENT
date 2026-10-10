@@ -18,6 +18,7 @@ import {
   publicClient,
   readJob,
   signRouterPull,
+  findFrontRunReceipt,
   usdc as fmt,
   type OnchainJob,
 } from "@/lib/gig";
@@ -115,6 +116,20 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     const w = await publicClient.readContract({ address: ADDR.identity, abi: identityAbi, functionName: "getAgentWallet", args: [job.agentId] });
     if (w === ZERO) throw new Error("Freelancer has no payout wallet set; they must set one first");
   };
+  // The router relays a payment signature for anyone. If someone front-ran ours, the freelancer was paid from
+  // the client's wallet and our tx reverted: prove it with that receipt and take the escrowed copy back.
+  const payOrRecover = async (account: `0x${string}`, value: bigint, send: () => ReturnType<typeof tx>, event: "JobReleased" | "JobResolved") => {
+    try {
+      const rc = await send();
+      keepReceipt(parseEventLogs({ abi: escrowAbi, eventName: event, logs: rc.logs })[0].args.receiptId);
+    } catch (e) {
+      const id = await findFrontRunReceipt(account, job.agentId, value);
+      if (id === undefined) throw e;
+      toast.info("Your payment was relayed by someone else. Reclaiming the escrowed copy…");
+      await tx("claimPaid", [jobId, id]);
+      keepReceipt(id);
+    }
+  };
   const keepReceipt = (id: bigint) => {
     localStorage.setItem(receiptKey(jobId), id.toString());
     setReceiptId(id);
@@ -138,8 +153,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     const { wallet, account } = needWallet();
     await payoutWalletSet();
     const s = await signRouterPull(wallet, account, job.agentId, job.amount);
-    const rc = await tx("release", [jobId, 0n, s.validBefore, s.salt, s.signature]);
-    keepReceipt(parseEventLogs({ abi: escrowAbi, eventName: "JobReleased", logs: rc.logs })[0].args.receiptId);
+    await payOrRecover(account, job.amount, () => tx("release", [jobId, 0n, s.validBefore, s.salt, s.signature]), "JobReleased");
   });
   const dispute = act(async () => {
     const reason = prompt("What is wrong with the delivery? (hashed onchain, keep a copy)") ?? "";
@@ -151,8 +165,7 @@ export default function JobPage({ params }: { params: Promise<{ id: string }> })
     if (job.offer === 0n) return void (await tx("settle", [jobId, 0n, 0n, 0n, zeroHash, "0x"]));
     await payoutWalletSet();
     const s = await signRouterPull(wallet, account, job.agentId, job.offer);
-    const rc = await tx("settle", [jobId, job.offer, 0n, s.validBefore, s.salt, s.signature]);
-    keepReceipt(parseEventLogs({ abi: escrowAbi, eventName: "JobResolved", logs: rc.logs })[0].args.receiptId);
+    await payOrRecover(account, job.offer, () => tx("settle", [jobId, job.offer, 0n, s.validBefore, s.salt, s.signature]), "JobResolved");
   });
   const rule = act(async () => { await tx("rule", [jobId, parseUnits(share || "0", 6)]); });
   const simple = (fn: "autoRelease" | "refund" | "resolveTimeout") => act(async () => { await tx(fn, [jobId]); });

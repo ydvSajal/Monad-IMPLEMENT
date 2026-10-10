@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IGroundedReputation} from "../../src/interfaces/IGroundedReputation.sol";
 import {IIdentityRegistry} from "../../src/interfaces/IIdentityRegistry.sol";
+import {IReceiptRegistry} from "../../src/interfaces/IReceiptRegistry.sol";
 import {IReceiptRouter} from "../../src/interfaces/IReceiptRouter.sol";
 
 /// @dev 6 dp token with an EIP-3009 stand-in. Signature bytes are ignored except that `v` must be 1
@@ -24,6 +25,20 @@ contract MockUSDC is ERC20 {
 
     function mint(address to, uint256 amount) external {
         _mint(to, amount);
+    }
+
+    /// @dev Stand-in for Circle's blacklist: transfers to or from a blocked address revert.
+    mapping(address => bool) public blocked;
+    error Blocked(address who);
+
+    function setBlocked(address who, bool b) external {
+        blocked[who] = b;
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (blocked[from]) revert Blocked(from);
+        if (blocked[to]) revert Blocked(to);
+        super._update(from, to, value);
     }
 
     function receiveWithAuthorization(
@@ -61,12 +76,14 @@ interface IMockUSDC3009 {
 }
 
 /// @dev Mirrors ReceiptRouter.payWithAuthorization: pull from `from`, forward to agent wallet, payer = from.
+///      Also stands in for the ReceiptRegistry (`receipts()` returns itself).
 contract MockRouter is IReceiptRouter {
     MockUSDC public immutable usdc;
     IIdentityRegistry public immutable identity;
     uint256 public nextReceipt = 1;
     mapping(uint256 receiptId => address payer) public payerOf;
     mapping(uint256 receiptId => uint256 agentId) public agentOf;
+    mapping(uint256 receiptId => IReceiptRegistry.Receipt) internal _receipts;
 
     error NoAgentWalletR(uint256 agentId);
 
@@ -91,6 +108,17 @@ contract MockRouter is IReceiptRouter {
         receiptId = nextReceipt++;
         payerOf[receiptId] = from;
         agentOf[receiptId] = agentId;
+        _receipts[receiptId] = IReceiptRegistry.Receipt(
+            agentId, from, token, uint96(value), uint40(block.timestamp), IReceiptRegistry.ReceiptStatus.Issued
+        );
+    }
+
+    function receipts() external view returns (address) {
+        return address(this);
+    }
+
+    function get(uint256 id) external view returns (IReceiptRegistry.Receipt memory) {
+        return _receipts[id];
     }
 
     function _pull(

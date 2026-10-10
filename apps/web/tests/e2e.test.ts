@@ -8,7 +8,7 @@ import { PGLiteSocketServer } from "@electric-sql/pglite-socket";
 import fs from "node:fs";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { parseEventLogs, type Address, type Hex } from "viem";
+import { parseAbi, parseEventLogs, type Address, type Hex } from "viem";
 
 import {
   RPC,
@@ -257,6 +257,27 @@ describe("release safety", () => {
     await acceptJob(id);
     const s = await lib.signRouterPull(client.wallet, client.address, agentId + 1n, AMOUNT);
     await expect(tx(client, "release", [id, 0n, s.validBefore, s.salt, s.signature])).rejects.toThrow();
+  });
+
+  it("a front-run release is recovered: the app finds the relayed receipt and claimPaid returns the escrowed copy", async () => {
+    await withSnapshot(async () => {
+      const id = await createJob();
+      await acceptJob(id);
+      const clientStart = await usdcOf(client.address);
+      const s = await lib.signRouterPull(client.wallet, client.address, agentId, AMOUNT);
+      // someone copies the signature and relays it straight to the real router
+      const router = parseAbi(["function payWithAuthorization(uint256 agentId, address token, address from, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 salt, bytes signature) returns (uint256)"]);
+      await send(stranger, { address: lib.ADDR.router, abi: router, functionName: "payWithAuthorization", args: [agentId, USDC, client.address, AMOUNT, 0n, s.validBefore, s.salt, s.signature] });
+      await expect(tx(client, "release", [id, 0n, s.validBefore, s.salt, s.signature])).rejects.toThrow();
+
+      const receiptId = await lib.findFrontRunReceipt(client.address, agentId, AMOUNT);
+      expect(receiptId).toBeDefined();
+      await tx(client, "claimPaid", [id, receiptId!]);
+      expect(await status(id)).toBe("Released");
+      expect(clientStart - (await usdcOf(client.address))).toBe(0n); // reimbursed: the money left via the relay, the escrow copy came back
+      // the receipt can't be claimed again
+      expect(await lib.findFrontRunReceipt(client.address, agentId, AMOUNT)).toBeUndefined();
+    });
   });
 
   it("cannot release twice", async () => {

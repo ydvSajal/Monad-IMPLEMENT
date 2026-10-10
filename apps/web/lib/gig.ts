@@ -38,6 +38,10 @@ export const escrowAbi = parseAbi([
   "function reviewWindow() view returns (uint256)",
   "function getJob(uint256 jobId) view returns (Job)",
   "function clientStats(address) view returns (uint32 posted, uint32 paid, uint32 disputed)",
+  "function owed(address) view returns (uint256)",
+  "function receiptUsed(uint256) view returns (bool)",
+  "function claimPaid(uint256 jobId, uint256 receiptId)",
+  "function withdraw()",
   "event JobCreated(uint256 indexed jobId, address indexed client, uint96 amount, address arbiter, bytes32 metaHash)",
   "event JobReleased(uint256 indexed jobId, uint256 receiptId)",
   "event JobResolved(uint256 indexed jobId, uint96 toFreelancer, uint8 how, uint256 receiptId)",
@@ -111,7 +115,8 @@ export async function signRouterPull(wallet: WalletClient, from: Address, agentI
   const salt = keccak256(toHex(crypto.getRandomValues(new Uint8Array(32))));
   const nonce = await publicClient.readContract({ address: ADDR.router, abi: routerAbi, functionName: "authorizationNonce", args: [agentId, salt] });
   // chain time, not the browser clock: a skewed clock would sign an authorization that is already expired
-  const validBefore = (await publicClient.getBlock()).timestamp + 3600n;
+  // short-lived: anyone may relay it to the router, so a signature leaked by a reverted tx must die fast
+  const validBefore = (await publicClient.getBlock()).timestamp + 300n;
   const signature = await wallet.signTypedData({
     account: wallet.account ?? from, // injected wallets: a json-rpc account; a local key signs in-process
     domain: { name: "USDC", version: "2", chainId: monad.id, verifyingContract: ADDR.usdc },
@@ -123,6 +128,25 @@ export async function signRouterPull(wallet: WalletClient, from: Address, agentI
     message: { from, to: ADDR.router, value, validAfter: 0n, validBefore, nonce },
   });
   return { validBefore, salt, signature };
+}
+
+const receiptIssued = parseAbi([
+  "event ReceiptIssued(uint256 indexed id, uint256 indexed agentId, address indexed payer, address token, uint96 amount)",
+])[0];
+
+/**
+ * After a failed `release`/`settle`: did someone relay the client's signature to the router first?
+ * If so, a fresh receipt (payer = client, this agent, exactly `value` USDC) exists that the escrow hasn't used.
+ */
+export async function findFrontRunReceipt(payer: Address, agentId: bigint, value: bigint): Promise<bigint | undefined> {
+  const latest = await publicClient.getBlockNumber();
+  // ponytail: last 100 blocks (~40s on Monad, also the usual eth_getLogs range cap); the relay lands right before the failed tx
+  const logs = await publicClient.getLogs({ address: ADDR.receipts, event: receiptIssued, args: { agentId, payer }, fromBlock: latest > 100n ? latest - 100n : 0n });
+  for (const l of logs.reverse()) {
+    if (l.args.token?.toLowerCase() !== ADDR.usdc.toLowerCase() || l.args.amount !== value) continue;
+    const used = await publicClient.readContract({ address: ADDR.escrow, abi: escrowAbi, functionName: "receiptUsed", args: [l.args.id!] });
+    if (!used) return l.args.id;
+  }
 }
 
 /** Message a freelancer signs to post a proposal as an agent. Bound to job + pitch so it can't be replayed elsewhere. */
