@@ -65,7 +65,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="gt-nav-end">
-          {account && (
+          {signedIn && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className="gt-nav-account">
