@@ -10,12 +10,12 @@ import {
   SquaresFourIcon,
 } from "@phosphor-icons/react/ssr";
 import Link from "next/link";
-import type { ComponentType } from "react";
+import type { CSSProperties, ComponentType } from "react";
 
 import { GlassCard } from "@/components/GlassCard";
 import { categoryLabel } from "@/lib/categories";
 
-const ICONS: Record<string, ComponentType<{ className?: string; weight?: "duotone" }>> = {
+const ICONS: Record<string, ComponentType<{ className?: string; style?: CSSProperties; weight?: "duotone" }>> = {
   design: PaintBrushIcon,
   development: CodeIcon,
   "smart-contracts": ShieldCheckIcon,
@@ -23,6 +23,16 @@ const ICONS: Record<string, ComponentType<{ className?: string; weight?: "duoton
   marketing: MegaphoneIcon,
   "data-ai": DatabaseIcon,
   other: SquaresFourIcon,
+};
+
+// One accent hue per category: the icon and the card's cursor spotlight take it.
+const HUES: Record<string, string> = {
+  design: "var(--hue-pink)",
+  development: "var(--hue-blue)",
+  "smart-contracts": "var(--hue-violet)",
+  writing: "var(--hue-orange)",
+  marketing: "var(--hue-green)",
+  "data-ai": "var(--hue-teal)",
 };
 
 export interface JobCardData {
@@ -48,13 +58,14 @@ const closes = (acceptBy: number) => {
 
 export function JobCard(j: JobCardData) {
   const Icon = ICONS[j.category] ?? SquaresFourIcon;
+  const hue = HUES[j.category] ?? "var(--hue-blue)";
   const open = j.minScore === 0 && j.minReviewers === 0;
   return (
     <Link href={`/jobs/${j.id}`} className="block h-full rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-      <GlassCard className="flex h-full flex-col gap-4 p-5">
+      <GlassCard className="flex h-full flex-col gap-4 p-5" style={{ "--tint": hue } as CSSProperties}>
         <div className="flex items-center justify-between gap-3">
           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Icon className="size-4 text-primary" weight="duotone" />
+            <Icon className="size-4" style={{ color: hue }} weight="duotone" />
             {categoryLabel(j.category)}
           </span>
           <span className="font-mono text-lg font-semibold tabular-nums">

@@ -79,9 +79,9 @@ const pill = (text: string) => page.locator(`.pill:text-is("${text}")`).waitFor(
 const clickBtn = (text: string | RegExp) => page.getByRole("button", { name: text }).click();
 /** Gated pages (/me, /jobs/new) ask for one SIWE signature; the session cookie is per wallet, so re-sign when the actor changes. */
 const gate = async () => {
-  const b = page.getByRole("button", { name: "Sign in with wallet" });
+  const b = page.getByRole("button", { name: "Sign in with MetaMask" });
   if (await b.waitFor({ timeout: 8_000 }).then(() => true, () => false)) await b.click();
-  await page.getByRole("button", { name: "Sign in with wallet" }).waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "Sign in with MetaMask" }).waitFor({ state: "detached" });
 };
 
 beforeAll(async () => {
@@ -181,7 +181,7 @@ describe("full job through the browser", () => {
     await gate();
     await page.locator('label:text-is("Title") + input').fill(TITLE);
     await page.locator('label:text-is("Description") + textarea').fill("Three concepts, vector files.");
-    await page.locator('label:has-text("Budget") + input').fill("20");
+    await page.locator("#job-budget").fill("20");
     await clickBtn("Fund and post");
     await page.waitForURL(/\/jobs\/1$/);
     await pill("Funded");

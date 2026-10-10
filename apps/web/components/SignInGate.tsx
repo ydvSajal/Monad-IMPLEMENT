@@ -4,6 +4,7 @@ import { LockKeyIcon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 
+import { MetaMaskFox } from "@/components/MetaMaskFox";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWallet } from "@/lib/wallet";
@@ -19,10 +20,11 @@ export function SignInGate({ children, title = "Sign in to continue" }: { childr
       <h2 className="text-xl font-semibold">{title}</h2>
       <p className="text-sm text-muted-foreground">One signature proves the wallet is yours. No transaction, no gas.</p>
       <Button
-        className="rounded-full"
+        className="rounded-full bg-[#F6851B] text-[#1d1d1f] hover:bg-[#e37a14]"
         onClick={() => signIn().then(() => toast.success("Signed in")).catch((e) => toast.error(e instanceof Error ? e.message : "Sign-in failed"))}
       >
-        Sign in with wallet
+        <span className="grid size-6 place-items-center rounded-full bg-white"><MetaMaskFox className="size-4" /></span>
+        Sign in with MetaMask
       </Button>
     </div>
   );

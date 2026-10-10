@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowUpRightIcon, CaretDownIcon, ListIcon, ShieldCheckIcon, SignOutIcon, UserCircleIcon, XIcon } from "@phosphor-icons/react";
+import { CaretDownIcon, ListIcon, ShieldCheckIcon, SignOutIcon, UserCircleIcon, XIcon } from "@phosphor-icons/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { MetaMaskFox } from "@/components/MetaMaskFox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWallet } from "@/lib/wallet";
@@ -17,8 +18,8 @@ const LINKS = [
 ];
 
 /**
- * Two-state floating nav. Top: transparent bar over the page. After scrolling past max(280, hero/2)
- * (or 30% of the viewport on pages without a [data-hero]) it settles into a glass pill. Styles: .gt-nav in globals.css.
+ * Two-state floating nav. Top of a page with a [data-hero]: transparent bar over the hero. After scrolling past
+ * max(280, hero/2), and always on pages without a hero, it is a glass pill. Styles: .gt-nav in globals.css.
  */
 export function SiteHeader() {
   const { account, signedIn, signIn, signOut, ready } = useWallet();
@@ -29,8 +30,8 @@ export function SiteHeader() {
   useEffect(() => {
     const update = () => {
       const hero = document.querySelector<HTMLElement>("[data-hero]");
-      const limit = hero ? Math.max(280, hero.offsetHeight * 0.5) : window.innerHeight * 0.3;
-      setScrolled(window.scrollY > limit);
+      // the transparent bar only works over the hero; elsewhere content scrolls under it, so use the glass pill from the start
+      setScrolled(!hero || window.scrollY > Math.max(280, hero.offsetHeight * 0.5));
     };
     update();
     window.addEventListener("scroll", update, { passive: true });
@@ -88,8 +89,9 @@ export function SiteHeader() {
             </DropdownMenu>
           )}
           {ready && !signedIn && (
-            <button type="button" className="gt-nav-cta" onClick={doSignIn}>
-              Sign in <ArrowUpRightIcon weight="bold" className="size-4" />
+            <button type="button" className="gt-nav-cta gt-nav-metamask" onClick={doSignIn} aria-label="Sign in with MetaMask">
+              <span className="gt-nav-fox"><MetaMaskFox className="size-4" /></span>
+              <span>Sign in<span className="max-[680px]:hidden"> with MetaMask</span></span>
             </button>
           )}
           <button type="button" className="gt-nav-burger" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} onClick={() => setOpen((o) => !o)}>

@@ -3,61 +3,42 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* GigTrust design tokens. One accent (mint = "verified"), one radius system:
-   cards 16px (--radius-xl), inputs/buttons-rect 10px (--radius-md), interactive pills fully round. */
+/* GigTrust design tokens. Light only, Apple-style: near-white canvas, ink text, one action colour (blue)
+   plus a small spectrum of accent hues used per category / section, never mixed inside one element.
+   One radius system: cards 16px (--radius-xl), inputs 10px (--radius-md), interactive pills fully round. */
 :root {
   --radius: 0.75rem;
-  --background: #f6f7f6;
-  --foreground: #101412;
+  --background: #fbfbfd;
+  --foreground: #1d1d1f;
   --card: #ffffff;
-  --card-foreground: #101412;
+  --card-foreground: #1d1d1f;
   --popover: #ffffff;
-  --popover-foreground: #101412;
-  --primary: #0b7a55;
-  --primary-foreground: #f4fffa;
-  --secondary: #e8ecea;
-  --secondary-foreground: #101412;
-  --muted: #eceff0;
-  --muted-foreground: #4f5a55;
-  --accent: #dff5ec;
-  --accent-foreground: #08573d;
-  --destructive: #c4372f;
-  --border: #d6dcd9;
-  --input: #cbd3cf;
-  --ring: #0b7a55;
-  --glass: rgb(255 255 255 / 0.7);
-  --glass-edge: rgb(16 20 18 / 0.1);
-  --glass-hi: rgb(255 255 255 / 0.9);
-  --ok: #0b7a55;
-  --bad: #c4372f;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --background: #0a0d0c;
-    --foreground: #eef2f0;
-    --card: #111715;
-    --card-foreground: #eef2f0;
-    --popover: #131a17;
-    --popover-foreground: #eef2f0;
-    --primary: #3ee6a8;
-    --primary-foreground: #04150e;
-    --secondary: #18201d;
-    --secondary-foreground: #eef2f0;
-    --muted: #161d1a;
-    --muted-foreground: #98a6a0;
-    --accent: #12281f;
-    --accent-foreground: #7bf0c3;
-    --destructive: #ff7a70;
-    --border: #232d29;
-    --input: #2a3631;
-    --ring: #3ee6a8;
-    --glass: rgb(22 30 27 / 0.55);
-    --glass-edge: rgb(255 255 255 / 0.09);
-    --glass-hi: rgb(255 255 255 / 0.12);
-    --ok: #3ee6a8;
-    --bad: #ff7a70;
-  }
+  --popover-foreground: #1d1d1f;
+  --primary: #0071e3;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f5;
+  --secondary-foreground: #1d1d1f;
+  --muted: #f2f2f5;
+  --muted-foreground: #6e6e73;
+  --accent: #e8f1fd;
+  --accent-foreground: #0058b0;
+  --destructive: #d70015;
+  --border: #e3e3e8;
+  --input: #d2d2d7;
+  --ring: #0071e3;
+  --glass: rgb(255 255 255 / 0.72);
+  --glass-edge: rgb(0 0 0 / 0.07);
+  --glass-hi: rgb(255 255 255 / 0.95);
+  --ok: #248a3d;
+  --bad: #d70015;
+  /* accent spectrum (AA on white at icon/heading sizes) */
+  --hue-blue: #0071e3;
+  --hue-pink: #e3007b;
+  --hue-orange: #f56300;
+  --hue-teal: #00a3a3;
+  --hue-violet: #7a3ff2;
+  --hue-green: #248a3d;
+  --tint: var(--primary);
 }
 
 @theme inline {
@@ -89,7 +70,7 @@
 
 @layer base {
   * { @apply border-border outline-ring/50; }
-  html { color-scheme: light dark; }
+  html { color-scheme: light; }
   body { @apply bg-background text-foreground font-sans antialiased; }
   ::selection { background: color-mix(in oklab, var(--primary) 35%, transparent); }
 }
@@ -98,7 +79,7 @@
 @utility glass {
   background: var(--glass);
   border: 1px solid var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 50px -24px rgb(0 0 0 / 0.5);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 1px 2px rgb(29 29 31 / 0.04), 0 12px 32px -16px rgb(29 29 31 / 0.12);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
 }
@@ -160,7 +141,7 @@
   border-radius: 999px;
   border-color: var(--glass-edge);
   background: linear-gradient(135deg, var(--glass-hi), var(--glass));
-  box-shadow: inset 0 1px 0 var(--glass-hi), 0 12px 32px -8px rgb(0 0 0 / 0.45);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 10px 30px -12px rgb(29 29 31 / 0.18);
   backdrop-filter: blur(24px) saturate(1.35);
   -webkit-backdrop-filter: blur(24px) saturate(1.35);
 }
@@ -186,10 +167,9 @@
   font-weight: 600;
   letter-spacing: 0;
   color: var(--foreground);
-  text-shadow: 0 2px 10px rgb(0 0 0 / 0.35);
-  transition: color var(--dur) var(--ease), font-size var(--dur) var(--ease), text-shadow var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), font-size var(--dur) var(--ease);
 }
-.gt-nav.is-scrolled .gt-nav-link { font-size: 0.8125rem; text-shadow: none; }
+.gt-nav.is-scrolled .gt-nav-link { font-size: 0.8125rem; }
 .gt-nav-link::after {
   content: "";
   position: absolute;
@@ -218,9 +198,14 @@
   font-size: 0.9375rem;
   background: var(--primary);
   color: var(--primary-foreground);
-  box-shadow: 0 9px 22px color-mix(in oklab, var(--primary) 28%, transparent);
+  box-shadow: 0 6px 16px -6px color-mix(in oklab, var(--primary) 45%, transparent);
 }
 .gt-nav-cta:active { transform: scale(0.98); }
+/* MetaMask orange with ink text (white on #F6851B is only 2.7:1); the fox sits on a white chip so its orange stays readable. */
+.gt-nav-metamask { background: #f6851b; color: #1d1d1f; box-shadow: 0 6px 16px -6px rgb(246 133 27 / 0.55); }
+.gt-nav-metamask:hover { background: #e37a14; }
+.gt-nav-fox { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px; background: #fff; }
+.gt-nav.is-scrolled .gt-nav-fox { width: 22px; height: 22px; }
 .gt-nav.is-scrolled .gt-nav-cta { padding: 8px 14px; border-radius: 999px; font-size: 0.8125rem; box-shadow: none; }
 .gt-nav-account {
   padding: 8px 12px;
@@ -244,7 +229,7 @@
   .gt-nav-bar { min-height: 58px; padding: 0 6px 0 10px; border-radius: 17px; gap: 8px; }
   .gt-nav.is-scrolled .gt-nav-bar, .gt-nav.is-open .gt-nav-bar { border-radius: 999px; }
   .gt-nav-links { display: none; }
-  .gt-nav-cta { padding: 8px 12px; min-width: 103px; justify-content: center; font-size: 0.8125rem; }
+  .gt-nav-cta { padding: 8px 12px; justify-content: center; font-size: 0.8125rem; }
   .gt-nav-burger { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 999px; color: var(--foreground); }
   .gt-nav-panel:not([hidden]) {
     display: flex;
@@ -258,7 +243,7 @@
     backdrop-filter: blur(22px) saturate(1.25);
     -webkit-backdrop-filter: blur(22px) saturate(1.25);
   }
-  .gt-nav-panel .gt-nav-link { padding: 12px 0; font-size: 1rem; text-shadow: none; }
+  .gt-nav-panel .gt-nav-link { padding: 12px 0; font-size: 1rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,9 +1,11 @@
 import { ArrowRightIcon, HandshakeIcon, LockKeyIcon, ReceiptIcon, SealCheckIcon, UserCircleMinusIcon } from "@phosphor-icons/react/ssr";
 import Link from "next/link";
+import type { CSSProperties } from "react";
 
 import AnimatedContent from "@/components/AnimatedContent";
 import BlurText from "@/components/BlurText";
 import CountUp from "@/components/CountUp";
+import { GlassCard } from "@/components/GlassCard";
 import { HeroSlats } from "@/components/HeroSlats";
 import { JobCard } from "@/components/JobCard";
 import { Button } from "@/components/ui/button";
@@ -30,7 +32,7 @@ export default async function Home() {
       <section data-hero className="relative isolate flex min-h-[100dvh] items-center overflow-hidden pt-24">
         <div className="absolute inset-0 -z-10">
           <HeroSlats />
-          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/70 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background via-background/50 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
         </div>
         <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6">
@@ -43,7 +45,7 @@ export default async function Home() {
               <Button asChild size="lg" className="rounded-full">
                 <Link href="/jobs">Browse jobs <ArrowRightIcon /></Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full bg-background/40 backdrop-blur">
+              <Button asChild size="lg" variant="outline" className="rounded-full bg-white/60 backdrop-blur">
                 <Link href="/jobs/new">Post a job</Link>
               </Button>
             </div>
@@ -53,18 +55,18 @@ export default async function Home() {
 
       <section className="mx-auto max-w-7xl px-4 sm:px-6">
         <AnimatedContent distance={30} duration={0.7}>
-          <dl className="glass grid gap-px overflow-hidden rounded-xl sm:grid-cols-3">
+          <dl className="grid gap-4 sm:grid-cols-3">
             {[
-              { k: "Jobs posted", v: posted ?? 0, suffix: "" },
-              { k: "Open now", v: open.jobs.length, suffix: "" },
-              { k: "USDC held in escrow", v: Math.round(escrowed), suffix: "" },
+              { k: "Jobs posted", v: posted ?? 0, hue: "var(--hue-blue)" },
+              { k: "Open now", v: open.jobs.length, hue: "var(--hue-pink)" },
+              { k: "USDC held in escrow", v: Math.round(escrowed), hue: "var(--hue-orange)" },
             ].map((s) => (
-              <div key={s.k} className="bg-card/40 p-6">
-                <dd className="font-mono text-4xl font-semibold tabular-nums">
+              <GlassCard key={s.k} className="p-6" style={{ "--tint": s.hue } as CSSProperties}>
+                <dd className="font-mono text-4xl font-semibold tabular-nums" style={{ color: s.hue }}>
                   <CountUp to={s.v} duration={1.6} separator="," />
                 </dd>
                 <dt className="mt-1 text-sm text-muted-foreground">{s.k}</dt>
-              </div>
+              </GlassCard>
             ))}
           </dl>
         </AnimatedContent>
@@ -79,18 +81,18 @@ export default async function Home() {
         </div>
         <ol className="space-y-4">
           {[
-            { Icon: LockKeyIcon, t: "Fund", d: "The client deposits budget plus the 5% fee. The contract refuses freelancers below the trust bar." },
-            { Icon: HandshakeIcon, t: "Deliver", d: "The freelancer accepts, delivers before the deadline, and the client reviews within seven days." },
-            { Icon: ReceiptIcon, t: "Release and rate", d: "Release pays the freelancer through Grounded and issues a receipt. Only that client can rate it." },
-          ].map(({ Icon, t, d }) => (
+            { Icon: LockKeyIcon, hue: "var(--hue-blue)", t: "Fund", d: "The client deposits budget plus the 5% fee. The contract refuses freelancers below the trust bar." },
+            { Icon: HandshakeIcon, hue: "var(--hue-violet)", t: "Deliver", d: "The freelancer accepts, delivers before the deadline, and the client reviews within seven days." },
+            { Icon: ReceiptIcon, hue: "var(--hue-teal)", t: "Release and rate", d: "Release pays the freelancer through Grounded and issues a receipt. Only that client can rate it." },
+          ].map(({ Icon, hue, t, d }) => (
             <AnimatedContent key={t} distance={40} duration={0.7}>
-              <li className="glass flex gap-4 rounded-xl p-6">
-                <Icon className="mt-0.5 size-7 shrink-0 text-primary" weight="duotone" />
+              <GlassCard as="li" className="flex gap-4 p-6" style={{ "--tint": hue } as CSSProperties}>
+                <Icon className="mt-0.5 size-7 shrink-0" style={{ color: hue }} weight="duotone" />
                 <div>
                   <h3 className="text-lg font-semibold">{t}</h3>
                   <p className="mt-1 text-muted-foreground">{d}</p>
                 </div>
-              </li>
+              </GlassCard>
             </AnimatedContent>
           ))}
         </ol>
@@ -99,26 +101,25 @@ export default async function Home() {
       <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6">
         <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">Why the score holds up</h2>
         <div className="mt-8 grid gap-4 md:grid-cols-6">
-          <div className="glass relative overflow-hidden rounded-xl p-8 md:col-span-4">
-            <div className="pointer-events-none absolute -right-16 -top-16 size-64 rounded-full bg-primary/15 blur-3xl" />
-            <SealCheckIcon className="size-9 text-primary" weight="duotone" />
+          <GlassCard className="p-8 md:col-span-4" style={{ "--tint": "var(--hue-blue)", background: "linear-gradient(135deg, color-mix(in oklab, var(--hue-blue) 9%, white), color-mix(in oklab, var(--hue-violet) 7%, white))" } as CSSProperties}>
+            <SealCheckIcon className="size-9 text-[var(--hue-blue)]" weight="duotone" />
             <h3 className="mt-4 text-2xl font-semibold">Ratings need a receipt</h3>
             <p className="mt-2 max-w-lg text-muted-foreground">
               A rating can only point at a payment the client chose to make. Fake reviews cost real money, plus the platform fee.
             </p>
-          </div>
-          <div className="glass rounded-xl p-8 md:col-span-2">
-            <UserCircleMinusIcon className="size-9 text-primary" weight="duotone" />
+          </GlassCard>
+          <GlassCard className="p-8 md:col-span-2" style={{ "--tint": "var(--hue-pink)", background: "linear-gradient(160deg, color-mix(in oklab, var(--hue-pink) 9%, white), color-mix(in oklab, var(--hue-orange) 7%, white))" } as CSSProperties}>
+            <UserCircleMinusIcon className="size-9 text-[var(--hue-pink)]" weight="duotone" />
             <h3 className="mt-4 text-xl font-semibold">No self-reviews</h3>
             <p className="mt-2 text-muted-foreground">Grounded excludes a freelancer&apos;s own wallets from their score.</p>
-          </div>
-          <div className="glass rounded-xl p-8 md:col-span-6">
+          </GlassCard>
+          <GlassCard className="p-8 md:col-span-6" style={{ "--tint": "var(--hue-teal)", background: "linear-gradient(90deg, color-mix(in oklab, var(--hue-teal) 9%, white), white 70%)" } as CSSProperties}>
             <h3 className="text-xl font-semibold">Portable by design</h3>
             <p className="mt-2 max-w-2xl text-muted-foreground">
               The score lives on-chain in Grounded, so it follows the freelancer off GigTrust and we cannot edit it.{" "}
               <a href={GROUNDED_SITE} className="text-primary underline-offset-4 hover:underline">See the public explorer</a>.
             </p>
-          </div>
+          </GlassCard>
         </div>
       </section>
 
