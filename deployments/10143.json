@@ -1,6 +1,6 @@
 {
   "chainId": 10143,
-  "gigEscrow": "",
+  "gigEscrow": "0xF3b576c74bEA22B892bfeA0FE2CBaD0B08b66e72",
   "groundedReputation": "0xaDDd1f2F876CD253C57177b675905Bdb0061bF82",
   "receiptRegistry": "0xa89b76Ea9AcEA12A66Fb23d318219b9119362301",
   "receiptRouter": "0xab442c3cbc2997a6218FEA0DD253c3717edfc62e",

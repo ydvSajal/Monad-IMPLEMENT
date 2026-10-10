@@ -367,7 +367,7 @@ Deploy: `FEE_RECIPIENT=0x… forge script script/Deploy.s.sol --rpc-url $NEXT_PU
 | ReviewerRegistry | `0xFb38DcB72C222d3943579b4F2c4C91ebcBE4eBa6` |
 | ERC-8004 Identity | `0x8004A818BFB912233c491871b3d84c89A494BD9e` |
 | ERC-8004 Reputation | `0x8004B663056A597Dffe9eCcC1965A193B7388713` |
-| GigEscrow | not deployed yet |
+| GigEscrow | `0xF3b576c74bEA22B892bfeA0FE2CBaD0B08b66e72` (block 69831184) |
 
 ---
 
