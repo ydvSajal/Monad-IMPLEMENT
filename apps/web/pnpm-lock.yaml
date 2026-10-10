@@ -12,8 +12,8 @@ importers:
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@sajalydv/grounded-sdk':
-        specifier: link:../../../MONAD10k/packages/sdk
-        version: link:../../../MONAD10k/packages/sdk
+        specifier: ^0.1.0
+        version: 0.1.0(typescript@5.9.3)
       '@tailwindcss/postcss':
         specifier: ^4.3.3
         version: 4.3.3
@@ -67,7 +67,7 @@ importers:
         version: 1.4.0
       viem:
         specifier: ^2.21.0
-        version: 2.57.3(typescript@5.9.3)
+        version: 2.57.3(typescript@5.9.3)(zod@3.25.76)
     devDependencies:
       '@electric-sql/pglite':
         specifier: ^0.5.8
@@ -1219,6 +1219,9 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
+  '@sajalydv/grounded-sdk@0.1.0':
+    resolution: {integrity: sha512-Rsa4rT8uSh4SJSltcp5lWG1fxKPbpTbHmen3rE6Xoh56TicnbssjC/L7/mPULZIRes50VRtN87cC35vuhtgVrQ==}
+
   '@scure/base@1.2.6':
     resolution: {integrity: sha512-g/nm5FgUa//MCj1gV09zTJTaM6KBAHqLN907YVQqf7zC49+DcO4B1so4ZX07Ef10Twr6nuqYEH9GEggFXA4Fmg==}
 
@@ -2041,6 +2044,9 @@ packages:
   xtend@4.0.2:
     resolution: {integrity: sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ==}
     engines: {node: '>=0.4'}
+
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
 snapshots:
 
@@ -3076,6 +3082,16 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
+  '@sajalydv/grounded-sdk@0.1.0(typescript@5.9.3)':
+    dependencies:
+      ox: 0.14.45(typescript@5.9.3)(zod@3.25.76)
+      viem: 2.57.3(typescript@5.9.3)(zod@3.25.76)
+      zod: 3.25.76
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
   '@scure/base@1.2.6': {}
 
   '@scure/bip32@1.7.0':
@@ -3200,9 +3216,10 @@ snapshots:
 
   '@vitest/spy@5.0.3': {}
 
-  abitype@1.2.3(typescript@5.9.3):
+  abitype@1.2.3(typescript@5.9.3)(zod@3.25.76):
     optionalDependencies:
       typescript: 5.9.3
+      zod: 3.25.76
 
   aria-hidden@1.2.6:
     dependencies:
@@ -3428,7 +3445,7 @@ snapshots:
 
   ogl@1.0.11: {}
 
-  ox@0.14.45(typescript@5.9.3):
+  ox@0.14.45(typescript@5.9.3)(zod@3.25.76):
     dependencies:
       '@adraffy/ens-normalize': 1.11.1
       '@noble/ciphers': 1.3.0
@@ -3436,7 +3453,7 @@ snapshots:
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@5.9.3)
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.9.3
@@ -3719,15 +3736,15 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.3.0
 
-  viem@2.57.3(typescript@5.9.3):
+  viem@2.57.3(typescript@5.9.3)(zod@3.25.76):
     dependencies:
       '@noble/curves': 1.9.1
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
-      abitype: 1.2.3(typescript@5.9.3)
+      abitype: 1.2.3(typescript@5.9.3)(zod@3.25.76)
       isows: 1.0.7(ws@8.21.0)
-      ox: 0.14.45(typescript@5.9.3)
+      ox: 0.14.45(typescript@5.9.3)(zod@3.25.76)
       ws: 8.21.0
     optionalDependencies:
       typescript: 5.9.3
@@ -3774,3 +3791,5 @@ snapshots:
   ws@8.21.0: {}
 
   xtend@4.0.2: {}
+
+  zod@3.25.76: {}

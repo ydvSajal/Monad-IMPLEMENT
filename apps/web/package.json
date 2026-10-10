@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
-    "@sajalydv/grounded-sdk": "link:../../../MONAD10k/packages/sdk",
+    "@sajalydv/grounded-sdk": "^0.1.0",
     "@tailwindcss/postcss": "^4.3.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
