@@ -7,6 +7,7 @@ import BlurText from "@/components/BlurText";
 import CountUp from "@/components/CountUp";
 import { GlassCard } from "@/components/GlassCard";
 import { HeroSlats } from "@/components/HeroSlats";
+import { HeroVideo } from "@/components/HeroVideo";
 import { JobCard } from "@/components/JobCard";
 import { Button } from "@/components/ui/button";
 import { loadOpenJobs } from "@/lib/browse";
@@ -35,21 +36,32 @@ export default async function Home() {
           <div className="absolute inset-0 bg-gradient-to-r from-background via-background/50 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
         </div>
-        <div className="mx-auto w-full max-w-7xl px-4 py-16 sm:px-6">
-          <div className="max-w-2xl">
-            <BlurText as="h1" text="Hire on a score only paying clients can move." delay={90} className="text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl" />
-            <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+        <div className="mx-auto grid w-full max-w-[100rem] items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14 lg:px-10">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-white/70 px-3.5 py-1.5 text-sm font-semibold uppercase tracking-wide text-primary backdrop-blur">
+              <span className="size-1.5 rounded-full bg-primary" /> Live on Monad testnet
+            </span>
+            <BlurText as="h1" text="Hire on a score only paying clients can move." delay={90} className="mt-5 text-4xl font-semibold leading-[1.08] tracking-[-0.03em] md:text-6xl xl:text-[4.5rem]" />
+            <p className="mt-6 max-w-xl text-xl leading-relaxed text-muted-foreground">
               Every review is backed by a real escrow payment, and reputation lives in Grounded where nobody can edit it.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg" className="rounded-full">
+              <Button asChild size="lg" className="h-12 rounded-full px-7 text-base">
                 <Link href="/jobs">Browse jobs <ArrowRightIcon /></Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full bg-white/60 backdrop-blur">
+              <Button asChild size="lg" variant="outline" className="h-12 rounded-full bg-white/60 px-7 text-base backdrop-blur">
                 <Link href="/jobs/new">Post a job</Link>
               </Button>
             </div>
+            <ul className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-base text-muted-foreground">
+              <li className="inline-flex items-center gap-1.5"><LockKeyIcon className="size-4" /> Non-custodial escrow</li>
+              <li className="inline-flex items-center gap-1.5"><ReceiptIcon className="size-4" /> Receipt-backed ratings</li>
+              <li className="inline-flex items-center gap-1.5"><SealCheckIcon className="size-4" /> Portable score</li>
+            </ul>
           </div>
+          <AnimatedContent distance={40} duration={0.8}>
+            <HeroVideo />
+          </AnimatedContent>
         </div>
       </section>
 
